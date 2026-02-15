@@ -1,5 +1,5 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
@@ -12,130 +12,48 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from parent directory
+// Serve static files
 app.use(express.static(path.join(__dirname, '..')));
 
-// Configure Nodemailer transporter
-const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // Use SSL
-    auth: {
-        user: process.env.EMAIL_USER, // Your Gmail address
-        pass: process.env.EMAIL_PASS  // Your Gmail App Password
-    },
-    connectionTimeout: 10000 // 10 seconds timeout
-});
-
-// Verify transporter configuration
-transporter.verify((error, success) => {
-    if (error) {
-        console.error('❌ Email transporter error:', error);
-    } else {
-        console.log('✅ Email server is ready to send messages');
-    }
-});
+// Configure Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Contact form endpoint
 app.post('/api/contact', async (req, res) => {
     const { from_name, from_email, message } = req.body;
 
-    // Validation
     if (!from_name || !from_email || !message) {
-        return res.status(400).json({
-            success: false,
-            message: 'All fields are required'
-        });
+        return res.status(400).json({ success: false, message: 'All fields are required' });
     }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(from_email)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid email address'
-        });
-    }
-
-    // Configure email options
-    const mailOptions = {
-        from: `"Portfolio Contact Form" <${process.env.EMAIL_USER}>`,
-        to: process.env.EMAIL_USER, // Send to yourself
-        replyTo: from_email,
-        subject: `New Contact Form Submission from ${from_name}`,
-        text: `
-Name: ${from_name}
-Email: ${from_email}
-
-Message:
-${message}
-        `,
-        html: `
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 5px 5px 0 0; }
-        .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-radius: 0 0 5px 5px; }
-        .field { margin-bottom: 15px; }
-        .label { font-weight: bold; color: #667eea; }
-        .message-box { background: white; padding: 15px; border-left: 4px solid #667eea; margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h2>📧 New Contact Form Submission</h2>
-        </div>
-        <div class="content">
-            <div class="field">
-                <span class="label">From:</span> ${from_name}
-            </div>
-            <div class="field">
-                <span class="label">Email:</span> <a href="mailto:${from_email}">${from_email}</a>
-            </div>
-            <div class="field">
-                <span class="label">Message:</span>
-                <div class="message-box">
-                    ${message.replace(/\n/g, '<br>')}
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-        `
-    };
 
     try {
-        // Send email
-        await transporter.sendMail(mailOptions);
-
-        console.log(`✅ Email sent from ${from_email}`);
-
-        res.json({
-            success: true,
-            message: 'Message sent successfully!'
+        const { data, error } = await resend.emails.send({
+            from: 'Portfolio <onboarding@resend.dev>', // Resend default for unverified domains
+            to: ['sridevipsr839@gmail.com'],
+            reply_to: from_email,
+            subject: `New Message from ${from_name}`,
+            html: `
+                <h3>New Contact Form Submission</h3>
+                <p><strong>Name:</strong> ${from_name}</p>
+                <p><strong>Email:</strong> ${from_email}</p>
+                <p><strong>Message:</strong></p>
+                <p>${message.replace(/\n/g, '<br>')}</p>
+            `,
         });
-    } catch (error) {
-        console.error('❌ Error sending email:', error);
 
-        res.status(500).json({
-            success: false,
-            message: 'Failed to send message. Please try again later.'
-        });
+        if (error) {
+            console.error('❌ Resend Error:', error);
+            return res.status(500).json({ success: false, message: 'Failed to send message.' });
+        }
+
+        console.log('✅ Email sent successfully:', data.id);
+        res.json({ success: true, message: 'Message sent successfully!' });
+    } catch (err) {
+        console.error('❌ Server Error:', err);
+        res.status(500).json({ success: false, message: 'Server error occurred.' });
     }
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Server is running' });
-});
-
-// Start server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📧 Contact form API: http://localhost:${PORT}/api/contact`);
 });
