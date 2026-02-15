@@ -129,12 +129,57 @@ document.addEventListener('DOMContentLoaded', () => {
         navLinks.classList.toggle('active');
     });
 
+    // Backend API Configuration
+    const API_URL = '/api/contact';
+
     // Form Handle
     const form = document.getElementById('contact-form');
-    form.addEventListener('submit', (e) => {
+    const submitButton = form.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton.textContent;
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        alert('Thanks for reaching out! (This is a demo action)');
-        form.reset();
+
+        // Get form data
+        const formData = {
+            from_name: form.querySelector('input[name="from_name"]').value,
+            from_email: form.querySelector('input[name="from_email"]').value,
+            message: form.querySelector('textarea[name="message"]').value
+        };
+
+        // Disable button and show loading state
+        submitButton.disabled = true;
+        submitButton.textContent = 'Sending...';
+
+        try {
+            // Send data to backend
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                // Success
+                alert('✅ Message sent successfully! I\'ll get back to you soon.');
+                form.reset();
+            } else {
+                // Server returned an error
+                alert(`❌ ${data.message || 'Something went wrong. Please try again.'}`);
+            }
+        } catch (error) {
+            // Network or other error
+            console.error('Error sending message:', error);
+            alert('❌ Failed to send message. Please make sure the server is running or email me directly at sridevipsr839@gmail.com');
+        } finally {
+            // Re-enable button
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+        }
     });
 
     // Particle Interaction (Neurons Effect)
