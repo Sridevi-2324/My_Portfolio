@@ -17,11 +17,14 @@ app.use(express.static(path.join(__dirname, '..')));
 
 // Configure Nodemailer transporter
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // Use SSL
     auth: {
         user: process.env.EMAIL_USER, // Your Gmail address
         pass: process.env.EMAIL_PASS  // Your Gmail App Password
-    }
+    },
+    connectionTimeout: 10000 // 10 seconds timeout
 });
 
 // Verify transporter configuration
